@@ -9,6 +9,7 @@ use File::Copy;
 use Data::Dumper;
 
 my $SCRIPTS_DIR = "restore";
+my $SYS_ROOT_DIR = "/tmp/restore-root";
 
 sub write_file($$) {
     my($name, $buffer) = @_;
@@ -355,6 +356,11 @@ sub read_fstab (\@) {
             if ($uuid) {
                 $script .= " -U $uuid";
             }
+            $script .= "\n";
+
+            my $mountpoint = $SYS_ROOT_DIR . $mount;
+            $script .= "mkdir -p $mountpoint\n";
+            $script .= "mount $dev $mountpoint\n";
 
             my $path = $SCRIPTS_DIR . "/" . $part->{"name"};
             mkpath($path);
@@ -383,7 +389,7 @@ push @blockdevs, read_luks(@blkid);
 push @blockdevs, read_crypttab(@blkid);
 push @blockdevs, read_fstab(@blkid);
 push @blockdevs, read_partitions();
-print(Dumper(@blockdevs));
+#print(Dumper(@blockdevs));
 
 
 #
@@ -409,7 +415,8 @@ foreach my $blockdev (@blockdevs) {
 # Generate master script with the correct order
 #
 
-my $script = "#!/bin/sh\n\n";
+# generate order
+my $order = ();
 my $change = 1;
 while ($change) {
     $change = 0;
@@ -427,8 +434,7 @@ while ($change) {
         }
 
         if ($go) {
-            print($blockdev->{"name"} . "\n");
-            $script .= "pushd " . $blockdev->{"name"} . "\n./script\npopd\n\n";
+            push(@$order, $blockdev);
             foreach my $provided (@{$blockdev->{"provides"}}) {
                 $present->{$provided} = 1;
             }
@@ -440,5 +446,18 @@ while ($change) {
     }
 }
 
-write_file($SCRIPTS_DIR . "/runall", $script);
-chmod(0755, $SCRIPTS_DIR . "/runall");
+# write script
+my $script = "#!/bin/sh\n\nWORK_DIR=`pwd`\n\n";
+
+$script .= "if [ \$# = 0 ]\nthen\n\techo Usage: $0 \\<path/to/backup.tgz\\>\nexit\nfi\n\n";
+$script .= "if [ `id -u` != 0 ]\nthen\n\techo WARNING: You probably want to run this script as root.\nfi\n\n";
+foreach my $item (@$order) {
+    print($item->{"name"} . "\n");
+    $script .= "cd " . $item->{"name"} . "\n./script\ncd \$WORK_DIR\n\n";
+}
+
+$script .= "cd $SYS_ROOT_DIR\ntar -xvzf --numeric-owner \$1\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
+$script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nchroot $SYS_ROOT_DIR grub-install\n";
+
+write_file($SCRIPTS_DIR . "/restore", $script);
+chmod(0755, $SCRIPTS_DIR . "/restore");
