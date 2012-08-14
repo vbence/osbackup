@@ -23,7 +23,6 @@ sub luks_check_magic($) {
         print(STDERR "Device is not in LUKS format (no magic).\n");
         exit(1001);
     }
-
 }
 
 sub luks_info($) {

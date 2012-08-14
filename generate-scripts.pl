@@ -108,7 +108,7 @@ sub read_partitions () {
         };
 
         if ($line =~ /^(\/dev\/[a-z0-9]+) /) {
-            push $part->{"provides"}, $1;
+            push(@{$part->{"provides"}}, $1);
         }
 
         # write line to dump file (segmenting central dump file)
@@ -137,14 +137,14 @@ sub read_raid (\@) {
 
         if ($line =~ /^(md([0-9]+)) : [^ ]+ (raid[0-9]+) (.*)/) {
             $array = {};
-            push @arrays, $array;
+            push(@arrays, $array);
             $array->{"name"} = "RAID/" . $1;
             $array->{"type"} = $3;
             $array->{"provides"} = ["/dev/" . $1, "/dev/md/" . $2];
             $array->{"requires"} = [];
             my $members = $4;
             while ($members =~ /([a-z0-9]+)\[[0-9]+\]/g) {
-                push $array->{"requires"}, "/dev/" . $1;
+                push @{$array->{"requires"}}, "/dev/" . $1;
             }
 
             # write restore script
@@ -209,7 +209,7 @@ sub read_lvm () {
 
             # device (for physical volume)
             if ($line =~ /device = "([^"]+)"/) {
-                push $volume->{"requires"}, $1;
+                push @{$volume->{"requires"}}, $1;
 
                 my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
                 append_file($path . "/physical", "pvcreate --restorefile lvm_backup " . $1 . "\n");
@@ -219,8 +219,8 @@ sub read_lvm () {
 
             # (logical) volume header
             if ($line =~ /^\t\t([^\t ]+) \{/) {
-                push $volume->{"provides"}, "/dev/" . $volname . "/" . $1;
-                push $volume->{"provides"}, "/dev/mapper/" . $volname . "-" . $1;
+                push @{$volume->{"provides"}}, "/dev/" . $volname . "/" . $1;
+                push @{$volume->{"provides"}}, "/dev/mapper/" . $volname . "-" . $1;
             };
         };
     }
@@ -348,7 +348,7 @@ sub read_fstab (\@) {
             $part->{"provides"} = [$mount];
             $part->{"requires"} = [$dev];
             if ($mount ne "/") {
-                push($part->{"requires"}, "/");
+                push(@{$part->{"requires"}}, "/");
             }
 
 

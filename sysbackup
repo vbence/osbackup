@@ -7,7 +7,7 @@ mkdir metadata
 echo This directory contains files with metadata for the recostruction. >metadata/README
 
 # saving partition table
-sfdisk -d /dev/sda > metadata/partitions
+sfdisk -d > metadata/partitions 2>/dev/null
 
 # saving block-device IDs
 blkid > metadata/blkid
