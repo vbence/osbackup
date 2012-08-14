@@ -33,7 +33,7 @@ sub append_file($$) {
 sub blkid_read () {
     my @devs = ();
     my $fh = IO::File->new();
-    $fh->open("blkid", "r");
+    $fh->open("metadata/blkid", "r");
     while (my $line = $fh->getline()) {
 
         my $dev = {};
@@ -88,7 +88,7 @@ sub read_partitions () {
     my @partitions = ();
     my $part = {};
     my $fh = IO::File->new();
-    $fh->open("partitions", "r");
+    $fh->open("metadata/partitions", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^# partition table of (\/dev\/([a-z0-9]+))/) {
@@ -132,7 +132,7 @@ sub read_raid (\@) {
     my @arrays = ();
     my $array = {};
     my $fh = IO::File->new();
-    $fh->open("mdstat", "r");
+    $fh->open("metadata/mdstat", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^(md([0-9]+)) : [^ ]+ (raid[0-9]+) (.*)/) {
@@ -178,7 +178,7 @@ sub read_lvm () {
     my $volname;
 
     my $fh = IO::File->new();
-    $fh->open("lvm", "r");
+    $fh->open("metadata/lvm", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^\tphysical_volumes \{/) {
@@ -198,7 +198,7 @@ sub read_lvm () {
 
             my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
             mkpath($path);
-            copy("lvm", $path . "/lvm_backup");
+            copy("metadata/lvm", $path . "/lvm_backup");
             write_file($path . "/script", "#!/bin/sh\n./physical\nvgcfgrestore -f lvm_backup -v " . $volname);
             chmod(0755, $path . "/script");
             write_file($path . "/physical", "#!/bin/sh\n");
@@ -236,7 +236,7 @@ sub read_luks (\@) {
     my @objects = ();
     my $part = {};
     my $fh = IO::File->new();
-    $fh->open("luks", "r");
+    $fh->open("metadata/luks", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^\/dev\/mapper\/([^ "]+|"[^"]+") ([^ "]+|"[^"]+") ([^ "]+|"[^"]+") ([^ "]+|"[^"]+")\n/) {
@@ -260,7 +260,7 @@ sub read_luks (\@) {
             mkpath($path);
             write_file($path . "/script", "#!/bin/sh\ncryptsetup luksformat --cipher $cypher --key-size $bits $dev\nlukstool setuuid $dev \"$uuid\"");
             chmod(0755, $path . "/script");
-            copy("lukstool", $path);
+            copy("tools/lukstool", $path);
             chmod(0755, $path . "/lukstool");
         };
 
@@ -277,7 +277,7 @@ sub read_crypttab (\@) {
     my @objects = ();
     my $part = {};
     my $fh = IO::File->new();
-    $fh->open("crypttab", "r");
+    $fh->open("metadata/crypttab", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^(.+?)[ \t]+(.+?)[ \t]+(.+?)[ \t]+(.+?)[ \t\n]/) {
@@ -317,7 +317,7 @@ sub read_fstab (\@) {
     my @objects = ();
     my $part = {};
     my $fh = IO::File->new();
-    $fh->open("fstab", "r");
+    $fh->open("metadata/fstab", "r");
     while (my $line = $fh->getline()) {
 
         if ($line =~ /^(\/dev\/.+?|UUID=.+?)[ \t]+(.+?)[ \t]+(ext2|ext3|ext4|msdos|vfat)[ \t]+/) {

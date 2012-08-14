@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# create directory for metadata outputs
+mkdir metadata
+
+# create info file
+echo This directory contains files with metadata for the recostruction. >metadata/README
+
+# saving partition table
+sfdisk -d /dev/sda > metadata/partitions
+
+# saving block-device IDs
+blkid > metadata/blkid
+
+# back-up LVM configs
+vgcfgbackup --file metadata/lvm
+
+# save RAID (md) info
+mdadm -Es > metadata/md
+
+# copy RAID array parameters
+cp /proc/mdstat metadata/mdstat
+
+# copy dm_crypt parameters
+cp /etc/crypttab metadata/crypttab
+
+# copy fstab for initial filesystems
+cp /etc/fstab metadata/fstab
+
+# save LUKS info
+touch luks
+rm luks
+for file in /dev/mapper/*
+do
+    info=`tools/lukstool shortinfo $file 2>/dev/null`
+    if [ "$info" !=  "" ]
+    then
+        echo $file $info >>metadata/luks
+    fi
+done
+
+# generate restore scripts
+./generate-scripts.pl
