@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+use IO::File;
+use File::Path;
+use File::Copy;
+use Data::Dumper;
+
+sub luks_check_magic($) {
+    my($dev) = @_;
+
+    my $fh = IO::File->new();
+    $fh->open($dev, "r");
+
+    my $magic;
+    $fh->seek(0, SEEK_SET);
+    $fh->read($magic, 6);
+    $fh->close();
+
+    if (unpack("H*", $magic) ne "4c554b53babe") {
+        print(STDERR "Device is not in LUKS format (no magic).\n");
+        exit(1001);
+    }
+
+}
+
+sub luks_info($) {
+    my($dev) = @_;
+
+    luks_check_magic($dev);
+
+    my $fh = IO::File->new();
+    $fh->open($dev, "r");
+
+    my $cypher_name;
+    $fh->seek(8, SEEK_SET);
+    $fh->read($cypher_name, 32);
+
+    my $key_bytes;
+    $fh->seek(108, SEEK_SET);
+    $fh->read($key_bytes, 4);
+    my $keysize = unpack("N", $key_bytes) * 8;
+
+    my $uuid;
+    $fh->seek(168, SEEK_SET);
+    $fh->read($uuid, 40);
+
+    $fh->close();
+
+    return ($cypher_name, $keysize, $uuid);
+}
+
+sub luks_setuid($$) {
+    my($dev, $uuid) = @_;
+
+    luks_check_magic($dev);
+
+    my $fh = IO::File->new();
+    $fh->open($dev, "r+");
+
+    $fh->seek(168, SEEK_SET);
+    $fh->write(pack("a40", $uuid));
+   
+    $fh->close();
+}
+
+if (@ARGV < 1) {
+    print(STDERR "Usage:\n    lukstool [info | shortinfo | setuuid] <device> [uuid]\n");
+    exit(1);
+}
+
+my $cmd = $ARGV[0];
+if ($cmd eq "info") {
+    my ($cypher_name, $keysize, $uuid) = luks_info($ARGV[1]);
+    print("cypher: $cypher_name\nkey-bits: $keysize\nuuid: $uuid\n");
+} elsif ($cmd eq "shortinfo") {
+    my ($cypher_name, $keysize, $uuid) = luks_info($ARGV[1]);
+    print("$cypher_name $keysize $uuid\n");
+} elsif ($cmd eq "setuuid") {
+    luks_setuid($ARGV[1], $ARGV[2]);
+} else {
+    print(STDERR "Unknown command: " . $ARGV[0] . "\n");
+    exit(2);
+}
