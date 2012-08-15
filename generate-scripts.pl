@@ -518,7 +518,7 @@ foreach my $item (@$order) {
 }
 
 $script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$1\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
-$script .= "cp -f $SYS_ROOT_DIR/boot/grub/devices.map $SYS_ROOT_DIR/boot/grub/devices.map.old\nrm $SYS_ROOT_DIR/boot/grub/devices.map\n";
+$script .= "cp -f $SYS_ROOT_DIR/boot/grub/device.map $SYS_ROOT_DIR/boot/grub/device.map.old\nrm $SYS_ROOT_DIR/boot/grub/device.map\n";
 $script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nmount --bind /proc $SYS_ROOT_DIR/proc\n";
 
 foreach my $dev (@$harddrives) {
