@@ -16,7 +16,7 @@ blkid > metadata/blkid
 vgcfgbackup --file metadata/lvm
 
 # save RAID (md) info
-mdadm -Es > metadata/md
+mdadm -Evs > metadata/md
 
 # copy RAID array parameters
 cp /proc/mdstat metadata/mdstat

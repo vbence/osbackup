@@ -101,7 +101,7 @@ sub read_partitions () {
             # write restore script
             my $path = $SCRIPTS_DIR . "/" . $part->{"name"};
             mkpath($path);
-            write_file($path . "/script", "#!/bin/sh\nsfdisk " . $1 . " < sfdisk_dump");
+            write_file($path . "/script", "#!/bin/sh\nsfdisk --force " . $1 . " < sfdisk_dump");
             chmod 0755, $path . "/script";
             write_file($path . "/sfdisk_dump", "");
 
@@ -129,36 +129,74 @@ sub read_partitions () {
 sub read_raid (\@) {
     my($devs) = @_;
 
+    my $script;
     my @arrays = ();
     my $array = {};
     my $fh = IO::File->new();
-    $fh->open("metadata/mdstat", "r");
+    $fh->open("metadata/md", "r");
     while (my $line = $fh->getline()) {
 
-        if ($line =~ /^(md([0-9]+)) : [^ ]+ (raid[0-9]+) (.*)/) {
+        if ($line =~ /^ARRAY \/dev\/md[\/]?([0-9]+) (.*?)[\n]?$/) {
             $array = {};
             push(@arrays, $array);
-            $array->{"name"} = "RAID/" . $1;
-            $array->{"type"} = $3;
-            $array->{"provides"} = ["/dev/" . $1, "/dev/md/" . $2];
+            $array->{"name"} = "RAID/md" . $1;
+            $array->{"provides"} = ["/dev/md" . $1];
             $array->{"requires"} = [];
-            my $members = $4;
-            while ($members =~ /([a-z0-9]+)\[[0-9]+\]/g) {
-                push @{$array->{"requires"}}, "/dev/" . $1;
+            
+            # start new script
+            $script = "#!/bin/sh\nmdadm --create /dev/md$1";
+
+            my $params = $2;
+            my $p;
+
+            # level
+            $p = $params;
+            if ($p =~ /level=([^ ]+)/i) {
+                $script .= " --level=$1";
+            }
+
+            # metadata version
+            $p = $params;
+            if ($p =~ /metadata=([^ ]+)/i) {
+                $script .= " --metadata=$1";
+            }
+
+            # number of devices
+            $p = $params;
+            if ($p =~ /num-devices=([^ ]+)/i) {
+                $script .= " --raid-devices=$1";
+            }
+
+            # UUID of the array
+            $p = $params;
+            if ($p =~ /UUID=([^ ]+)/i) {
+                $script .= " --uuid=\"$1\"";
+            }
+
+            # name of the array
+            $p = $params;
+            if ($p =~ /name=([^ ]+)/i) {
+                $script .= " --name=\"$1\"";
+            }
+
+        } elsif ($line =~ /devices=([^\n]+)/) {
+
+            $script .= " \\\n";
+
+            my @devices = split(/,/, $1);
+            foreach my $dev (@devices) {
+                push(@{$array->{"requires"}}, $dev);
+
+                $script .= "`[ -e " . $dev . " ] && echo " . $dev . " || echo missing` \\\n";
             }
 
             # write restore script
             my $path = $SCRIPTS_DIR . "/" . $array->{"name"};
             mkpath($path);
-            my $script = "#!/bin/sh\nmdadm --create /dev/" . $1  . " --metadata=1.2 --level=" . $3 . " --uuid=" . blkid_info_by_path(@$devs, "/dev/" . $1)->{"uuid"} . " --raid-devices=" . scalar(@{$array->{"requires"}}) . " \\\n";
-            my $member;
-            foreach $member (@{$array->{"requires"}}) {
-                $script .= "`[ -e " . $member . " ] && echo " . $member . " || echo missing` \\\n";
-            }
             write_file($path . "/script", $script);
             chmod 0755, $path . "/script";
 
-        };
+        }
     }
     $fh->close;
 
@@ -172,12 +210,23 @@ sub read_lvm () {
     use constant IN_PHYSICAL => 2;
     use constant IN_LOGICAL => 3;
 
+    my $fh;
+
+    my $pvids = {};
+    $fh = IO::File->new();
+    $fh->open("metadata/pvs", "r");
+    while (my $line = $fh->getline()) {
+        if ($line =~ /PV ([^ ]+) with UUID ([^ ]+)/) {
+            $pvids->{$1} = $2;
+        }
+    }
+
     my @volumes = ();
     my $volume = {};
     my $status = IN_VOLUME;
     my $volname;
 
-    my $fh = IO::File->new();
+    $fh = IO::File->new();
     $fh->open("metadata/lvm", "r");
     while (my $line = $fh->getline()) {
 
@@ -199,7 +248,7 @@ sub read_lvm () {
             my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
             mkpath($path);
             copy("metadata/lvm", $path . "/lvm_backup");
-            write_file($path . "/script", "#!/bin/sh\n./physical\nvgcfgrestore -f lvm_backup -v " . $volname);
+            write_file($path . "/script", "#!/bin/sh\n./physical\nvgcfgrestore -f lvm_backup -v " . $volname . "\nvgchange -ay " . $volname);
             chmod(0755, $path . "/script");
             write_file($path . "/physical", "#!/bin/sh\n");
             chmod(0755, $path . "/physical");
@@ -212,7 +261,7 @@ sub read_lvm () {
                 push @{$volume->{"requires"}}, $1;
 
                 my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
-                append_file($path . "/physical", "pvcreate --restorefile lvm_backup " . $1 . "\n");
+                append_file($path . "/physical", "pvcreate --restorefile lvm_backup --uuid \"" . $pvids->{$1} . "\" " . $1 . "\n");
             };
 
         } elsif ($status == IN_LOGICAL) {
@@ -258,7 +307,7 @@ sub read_luks (\@) {
 
             my $path = $SCRIPTS_DIR . "/" . $part->{"name"};
             mkpath($path);
-            write_file($path . "/script", "#!/bin/sh\ncryptsetup luksformat --cipher $cypher --key-size $bits $dev\nlukstool setuuid $dev \"$uuid\"");
+            write_file($path . "/script", "#!/bin/sh\ncryptsetup luksFormat --cipher $cypher --key-size $bits $dev\n./lukstool setuuid $dev \"$uuid\"");
             chmod(0755, $path . "/script");
             copy("tools/lukstool", $path);
             chmod(0755, $path . "/lukstool");
@@ -411,6 +460,18 @@ foreach my $blockdev (@blockdevs) {
     }
 }
 
+# list default devices with partition tables
+my $harddrives = ();
+foreach my $blockdev (@blockdevs) {
+    my $name = $blockdev->{"name"};
+    if ($name =~ /^PARTITION\/(.*)/) {
+        if ($present->{$blockdev->{"requires"}[0]}) {
+            push(@$harddrives, $blockdev->{"requires"}[0]);
+        }
+    }
+}
+
+
 #
 # Generate master script with the correct order
 #
@@ -456,8 +517,13 @@ foreach my $item (@$order) {
     $script .= "cd " . $item->{"name"} . "\n./script\ncd \$WORK_DIR\n\n";
 }
 
-$script .= "cd $SYS_ROOT_DIR\ntar -xvzf --numeric-owner \$1\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
-$script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nchroot $SYS_ROOT_DIR grub-install\n";
+$script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$1\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
+$script .= "cp -f $SYS_ROOT_DIR/boot/grub/devices.map $SYS_ROOT_DIR/boot/grub/devices.map.old\nrm $SYS_ROOT_DIR/boot/grub/devices.map\n";
+$script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nmount --bind /proc $SYS_ROOT_DIR/proc\n";
+
+foreach my $dev (@$harddrives) {
+    $script .= "chroot $SYS_ROOT_DIR grub-install $dev\n";
+}
 
 write_file($SCRIPTS_DIR . "/restore", $script);
 chmod(0755, $SCRIPTS_DIR . "/restore");
