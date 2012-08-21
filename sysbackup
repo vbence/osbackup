@@ -12,6 +12,9 @@ sfdisk -d > metadata/partitions 2>/dev/null
 # saving block-device IDs
 blkid > metadata/blkid
 
+# physical volumes
+pvscan -u > metadata/pvs
+
 # back-up LVM configs
 vgcfgbackup --file metadata/lvm
 
@@ -38,6 +41,10 @@ do
         echo $file $info >>metadata/luks
     fi
 done
+
+# create archive
+mkdir restore
+tar cvpzf restore/root.tgz --exclude=`pwd`/restore --exclude=/proc --exclude=/lost+found --exclude=/sys --exclude=/tmp $TAR_FLAGS /
 
 # generate restore scripts
 ./generate-scripts.pl

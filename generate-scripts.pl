@@ -257,7 +257,7 @@ sub read_lvm () {
         if ($status == IN_PHYSICAL) {
 
             # device (for physical volume)
-            if ($line =~ /device = "([^"]+)"/) {
+            if ($line =~ /device = "([^\"]+)"/) {
                 push @{$volume->{"requires"}}, $1;
 
                 my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
@@ -341,7 +341,7 @@ sub read_crypttab (\@) {
                 # create and store new object
                 $part = {};
                 push @objects, $part;
-                
+
                 # store name and device name
                 $part->{"name"} = "CRYPT/" . $name;
                 $part->{"provides"} = ["/dev/mapper/" . $name];
@@ -430,7 +430,7 @@ sub read_fstab (\@) {
 # device id (and type) info
 my @blkid = blkid_read();
 
-# objects representing blovk devices
+# objects representing block devices
 my @blockdevs;
 push @blockdevs, read_raid(@blkid);
 push @blockdevs, read_lvm();
