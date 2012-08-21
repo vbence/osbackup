@@ -307,7 +307,7 @@ sub read_luks (\@) {
 
             my $path = $SCRIPTS_DIR . "/" . $part->{"name"};
             mkpath($path);
-            write_file($path . "/script", "#!/bin/sh\ncryptsetup luksFormat --cipher $cypher --key-size $bits $dev\n./lukstool setuuid $dev \"$uuid\"");
+            write_file($path . "/script", "#!/bin/sh\ncryptsetup luksFormat --cipher $cypher --key-size $bits $dev\n./lukstool setuuid $dev \"$uuid\"\ncryptdisks_start ${name}_crypt");
             chmod(0755, $path . "/script");
             copy("tools/lukstool", $path);
             chmod(0755, $path . "/lukstool");
@@ -510,14 +510,17 @@ while ($change) {
 # write script
 my $script = "#!/bin/sh\n\nWORK_DIR=`pwd`\n\n";
 
-$script .= "if [ \$# = 0 ]\nthen\n\techo Usage: $0 \\<path/to/backup.tgz\\>\nexit\nfi\n\n";
+#$script .= "if [ -e $WORK_DIR/root.tgz ]\nthen\n\tBACKUP_FILE=$WORK_DIR/root.tgz\nfi\n\n";
+#$script .= "if [ \$# = 0 ]\nthen\n\techo Usage: $0 \\</absolute/path/to/root.tgz\\>\n\texit\nfi\n\n";
+$script .= "if [ \$# = 0 ]\nthen\n\tBACKUP_FILE=\$WORK_DIR/root.tgz\nelse\n\tBACKUP_FILE=\$1;\nfi\n\n";
+$script .= "if [ ! -e \$BACKUP_FILE ]\nthen\n\techo File does not exist: \$BACKUP_FILE\nfi\n\n";
 $script .= "if [ `id -u` != 0 ]\nthen\n\techo WARNING: You probably want to run this script as root.\nfi\n\n";
 foreach my $item (@$order) {
     print($item->{"name"} . "\n");
     $script .= "cd " . $item->{"name"} . "\n./script\ncd \$WORK_DIR\n\n";
 }
 
-$script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$1\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
+$script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$tBACKUP_FILE\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
 $script .= "cp -f $SYS_ROOT_DIR/boot/grub/device.map $SYS_ROOT_DIR/boot/grub/device.map.old\nrm $SYS_ROOT_DIR/boot/grub/device.map\n";
 $script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nmount --bind /proc $SYS_ROOT_DIR/proc\n";
 
