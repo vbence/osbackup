@@ -520,7 +520,7 @@ foreach my $item (@$order) {
     $script .= "cd " . $item->{"name"} . "\n./script\ncd \$WORK_DIR\n\n";
 }
 
-$script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$tBACKUP_FILE\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
+$script .= "cd $SYS_ROOT_DIR\ntar --numeric-owner -xvzf \$BACKUP_FILE\nmkdir proc sys tmp\ncd \$WORK_DIR\n\n";
 $script .= "cp -f $SYS_ROOT_DIR/boot/grub/device.map $SYS_ROOT_DIR/boot/grub/device.map.old\nrm $SYS_ROOT_DIR/boot/grub/device.map\n";
 $script .= "mount --bind /dev $SYS_ROOT_DIR/dev\nmount --bind /proc $SYS_ROOT_DIR/proc\n";
 
