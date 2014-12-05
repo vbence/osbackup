@@ -129,8 +129,12 @@ sub read_partitions () {
 sub read_raid (\@) {
     my($devs) = @_;
 
-    my $script;
     my @arrays = ();
+    if (! -e "metadata/md") {
+        return @arrays;
+    }
+
+    my $script;
     my $array = {};
     my $fh = IO::File->new();
     $fh->open("metadata/md", "r");
@@ -210,6 +214,11 @@ sub read_lvm () {
     use constant IN_PHYSICAL => 2;
     use constant IN_LOGICAL => 3;
 
+    my @volumes = ();
+    if (! -e "metadata/pvs") {
+        return @volumes;
+    }
+
     my $fh;
 
     my $pvids = {};
@@ -221,7 +230,6 @@ sub read_lvm () {
         }
     }
 
-    my @volumes = ();
     my $volume = {};
     my $status = IN_VOLUME;
     my $volname;
@@ -283,6 +291,10 @@ sub read_luks (\@) {
     my ($devs) = @_;
 
     my @objects = ();
+    if (! -e "metadata/luks") {
+        return @objects;
+    }
+
     my $part = {};
     my $fh = IO::File->new();
     $fh->open("metadata/luks", "r");
@@ -324,6 +336,10 @@ sub read_crypttab (\@) {
     my ($devs) = @_;
 
     my @objects = ();
+    if (! -e "metadata/crypttab") {
+        return @objects;
+    }
+
     my $part = {};
     my $fh = IO::File->new();
     $fh->open("metadata/crypttab", "r");
