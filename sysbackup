@@ -1,7 +1,14 @@
 #!/bin/sh
 
+# root check
+if [ "$(id -u)" !=  "0" ]
+then
+    >&2 echo "You should be root to do a successful backup!"
+    exit 1
+fi
+
 # create directory for metadata outputs
-mkdir metadata
+mkdir metadata  2>/dev/null
 
 # create info file
 echo This directory contains files with metadata for the recostruction. >metadata/README
