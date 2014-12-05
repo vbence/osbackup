@@ -20,19 +20,19 @@ sfdisk -d > metadata/partitions 2>/dev/null
 blkid > metadata/blkid
 
 # physical volumes
-pvscan -u > metadata/pvs
+pvscan -u > metadata/pvs 2>/dev/null
 
 # back-up LVM configs
-vgcfgbackup --file metadata/lvm
+vgcfgbackup --file metadata/lvm 2>/dev/null
 
 # save RAID (md) info
-mdadm -Evs > metadata/md
+mdadm -Evs > metadata/md 2>/dev/null
 
 # copy RAID array parameters
-cp /proc/mdstat metadata/mdstat
+cp /proc/mdstat metadata/mdstat 2>/dev/null
 
 # copy dm_crypt parameters
-cp /etc/crypttab metadata/crypttab
+cp /etc/crypttab metadata/crypttab 2>/dev/null
 
 # copy fstab for initial filesystems
 cp /etc/fstab metadata/fstab
