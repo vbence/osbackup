@@ -50,7 +50,7 @@ do
 done
 
 # create archive
-mkdir restore
+mkdir restore  2>/dev/null
 tar cvpzf restore/root.tgz --exclude=`pwd`/restore --exclude=/proc --exclude=/lost+found --exclude=/sys --exclude=/tmp $TAR_FLAGS /
 
 # generate restore scripts
