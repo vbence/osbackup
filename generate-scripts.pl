@@ -435,6 +435,11 @@ sub read_fstab (\@) {
     }
 
     $fh->close;
+    
+    # Order by ascending length of the mount point name (stored in provides[0])
+    # this will guarantee the correct order dependent mount points.
+    # E.g. mount "/boot" before "/boot/grub".
+    @objects = sort {length($a->{"provides"}[0]) cmp length($b->{"provides"}[0])} @objects;
 
     return @objects;
 }
