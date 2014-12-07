@@ -96,6 +96,7 @@ sub read_partitions () {
             push @partitions, $part;
             $part->{"name"} = "PARTITION/" . $2;
             $part->{"requires"} = [$1];
+            $part->{"requires-bin"} = ["sfdisk"];
             $part->{"provides"} = [];
 
             # write restore script
@@ -146,6 +147,7 @@ sub read_raid (\@) {
             $array->{"name"} = "RAID/md" . $1;
             $array->{"provides"} = ["/dev/md" . $1];
             $array->{"requires"} = [];
+            $array->{"requires-bin"} = ["mdadm"];
             
             # start new script
             $script = "#!/bin/sh\nmdadm --create /dev/md$1";
@@ -251,6 +253,7 @@ sub read_lvm () {
             $volname = $1;
             $volume->{"name"} = "LVM/" . $volname;
             $volume->{"requires"} = [];
+            $volume->{"requires-bin"} = ["pvcreate", "vgcfgrestore", "vgchange"];
             $volume->{"provides"} = [];
 
             my $path = $SCRIPTS_DIR . "/" . $volume->{"name"};
@@ -315,6 +318,7 @@ sub read_luks (\@) {
             # store name and device name
             $part->{"name"} = "LUKS/" . $name . "_crypt";
             $part->{"provides"} = ["/dev/mapper/" . $name . "_crypt"];
+            $part->{"requires-bin"} = ["cryptsetup", "cryptdisks_start"];
             $part->{"requires"} = [$dev];
 
             my $path = $SCRIPTS_DIR . "/" . $part->{"name"};
@@ -412,6 +416,7 @@ sub read_fstab (\@) {
             $part->{"name"} = $name;
             $part->{"provides"} = [$mount];
             $part->{"requires"} = [$dev];
+            $part->{"requires-bin"} = ["mkfs.$type"];
             if ($mount ne "/") {
                 push(@{$part->{"requires"}}, "/");
             }
@@ -461,6 +466,18 @@ push @blockdevs, read_fstab(@blkid);
 push @blockdevs, read_partitions();
 #print(Dumper(@blockdevs));
 
+
+#
+# Software (binary) requirements
+#
+my $binary = {};
+
+# mark all requirements
+foreach my $blockdev (@blockdevs) {
+    foreach my $dependance (@{$blockdev->{"requires-bin"}}) {
+        $binary->{$dependance} = 1;
+    }
+}
 
 #
 # Mark the trivial requirements as "present"
@@ -530,6 +547,16 @@ while ($change) {
 
 # write script
 my $script = "#!/bin/sh\n\nWORK_DIR=`pwd`\n\n";
+
+if (scalar($binary) > 0) {
+    $script .= "MISSING_COMMANDS=\"\"\nfor i in";
+    foreach my $command (keys $binary) {
+        $script .= " $command";
+    }
+
+    $script .= "\ndo\n\tif [ \"`which \$i`\" = \"\" ]\n\tthen\n\t\tMISSING_COMMANDS=\"\$MISSING_COMMANDS \$i\"\n\tfi\ndone\n\n";
+    $script .= "if [ \"\$MISSING_COMMANDS\" != \"\" ]\nthen\n\techo \"Missing commands (please install the packages providing them):\\n\$MISSING_COMMANDS\"\n\texit 1\nfi\n\n";
+}
 
 #$script .= "if [ -e $WORK_DIR/root.tgz ]\nthen\n\tBACKUP_FILE=$WORK_DIR/root.tgz\nfi\n\n";
 #$script .= "if [ \$# = 0 ]\nthen\n\techo Usage: $0 \\</absolute/path/to/root.tgz\\>\n\texit\nfi\n\n";
