@@ -422,9 +422,26 @@ sub read_fstab (\@) {
             }
 
 
-            my $script = "#!/bin/sh\nmkfs.$type $dev";
-            if ($uuid) {
-                $script .= " -U $uuid";
+            my $script = "";
+            if ($type =~ /^ext./) {
+                $script .= "#!/bin/sh\nmkfs.$type $dev";
+                
+                if ($uuid) {
+                    $script .= " -U $uuid";
+                }
+            } elsif ($type =~ /^.?fat/) {
+                $script .= "#!/bin/sh\nEXTRAS=\"\"\n";
+                $script .= "if [ `blockdev --getsize64 $dev` -lt 1073741824 ]; then\n";
+                $script .= "\tEXTRAS=\"\$EXTRAS -s 1\"\n";
+                $script .= "fi\n";
+                $script .= "mkfs.$type -F 32 $dev";
+
+                if ($uuid) {
+                    my $id = $uuid;
+                    $id =~ s/[^a-z0-9]//ig;
+                    $script .= " -i $id";
+                }
+                $script .= " \$EXTRAS";
             }
             $script .= "\n";
 
