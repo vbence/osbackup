@@ -550,7 +550,7 @@ my $script = "#!/bin/sh\n\nWORK_DIR=`pwd`\n\n";
 
 if (scalar($binary) > 0) {
     $script .= "MISSING_COMMANDS=\"\"\nfor i in";
-    foreach my $command (keys $binary) {
+    foreach my $command (keys %{$binary}) {
         $script .= " $command";
     }
 
